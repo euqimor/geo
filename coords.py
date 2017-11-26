@@ -4,6 +4,7 @@ import geocoder
 import pickle
 from openpyxl import Workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
+import threading
 import sys
 
 
@@ -78,56 +79,51 @@ class Locality(Location):
         return (distances[closest], closest)
 
 
-def create_locality_list(addr_file_full_path, app=None):
+def create_locality_list(addr_file_full_path, app=None, thread_=None, queue_=None):
     """
     Creates a list of Locality objects from the addresses file, stores problematic addresses in a separate list
     :param addr_file_full_path: the full path (including the file name) to the text file with one address on each line
     :return: a tuple, (obj list: Localities, str list: problematic addresses, bool: errors flag)
     """
-    import threading
-    lock = threading.Lock()
-    # def update_console_window(app, text_to_append):
-    #     original_text = app.getLabel('console_window')
-    #     app.setLabel('console_window', original_text+text_to_append)
-
-    # if app:
-    #     console_thread = threading.Thread(target=update_console_window)
-    #     console_thread.start()
-
     errors_flag = False
     locality_list = []
     failed_requests = []
+    lock = threading.Lock()
     with open(addr_file_full_path) as f:
         total_addresses = len(f.readlines())
         one_percent = total_addresses/100
         f.seek(0)
         for i,line in enumerate(f):
-            address = line.strip()
-            loc_json = geocoder.yandex(address, lang='ru-RU').json
-            try:
-                locality = Locality(
-                    address,
-                    float(loc_json['lat']),
-                    float(loc_json['lng']),
-                    loc_json.get('county'),  # there may be no county, we use get() to avoid an exception
-                    loc_json['state'],
-                    loc_json['description']
-                )
-                locality_list.append(locality)
-                if app:
-                    with lock:
-                        app.setMeter("progress", i//one_percent)
-                        app.setLabel('console_window', app.getLabel('console_window') + '.')
-                else:
-                    print('.', end='', flush=True)
-            except (KeyError, TypeError):
-                failed_requests.append(address)
-                if app:
-                    with lock:
-                        app.setMeter("progress", i // one_percent)
-                        app.setLabel('console_window', app.getLabel('console_window') + 'X')
-                else:
-                    print('X', end='', flush=True)
+            if thread_ is None or (thread_ and not thread_.interrupt_event.is_set()):
+                address = line.strip()
+                loc_json = geocoder.yandex(address, lang='ru-RU').json
+                try:
+                    locality = Locality(
+                        address,
+                        float(loc_json['lat']),
+                        float(loc_json['lng']),
+                        loc_json.get('county'),  # there may be no county, we use get() to avoid an exception
+                        loc_json['state'],
+                        loc_json['description']
+                    )
+                    locality_list.append(locality)
+                    if app:
+                        with lock:
+                            app.setMeter("progress", i//one_percent)
+                            # app.setMessage('console_window', app.getMessage('console_window') + '.')
+                    else:
+                        print('.', end='', flush=True)
+                except (KeyError, TypeError):
+                    failed_requests.append(address)
+                    if app:
+                        with lock:
+                            app.setMeter("progress", i // one_percent)
+                            # app.setMessage('console_window', app.getMessage('console_window') + 'X')
+                    else:
+                        print('X', end='', flush=True)
+            else:
+                print('Stopping due to an interrupt')
+                exit(0)
     print('')
     if app:
         with lock:
@@ -135,6 +131,8 @@ def create_locality_list(addr_file_full_path, app=None):
     if failed_requests:
         errors_flag = True
         print('Возникли проблемы с частью запросов, проверьте список ошибок')
+    if queue_:
+        queue_.put((locality_list, failed_requests, errors_flag))
     return (locality_list, failed_requests, errors_flag)
 
 
