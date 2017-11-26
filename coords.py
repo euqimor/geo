@@ -79,7 +79,7 @@ class Locality(Location):
         return (distances[closest], closest)
 
 
-def create_locality_list(addr_file_full_path, app=None, thread_=None, queue_=None):
+def create_locality_list(addr_file_full_path, app=None, thread_=None, result_queue=None, update_queue=None):
     """
     Creates a list of Locality objects from the addresses file, stores problematic addresses in a separate list
     :param addr_file_full_path: the full path (including the file name) to the text file with one address on each line
@@ -107,17 +107,21 @@ def create_locality_list(addr_file_full_path, app=None, thread_=None, queue_=Non
                         loc_json['description']
                     )
                     locality_list.append(locality)
-                    if app:
-                        with lock:
-                            app.setMeter("progress", i//one_percent)
+                    if update_queue:
+                        update_queue.put_nowait(i // one_percent)
+                    # if app:
+                    #     with lock:
+                    #         app.setMeter("progress", i//one_percent)
                             # app.setMessage('console_window', app.getMessage('console_window') + '.')
                     else:
                         print('.', end='', flush=True)
                 except (KeyError, TypeError):
                     failed_requests.append(address)
-                    if app:
-                        with lock:
-                            app.setMeter("progress", i // one_percent)
+                    if update_queue:
+                        update_queue.put_nowait(i // one_percent)
+                    # if app:
+                    #     with lock:
+                    #         app.setMeter("progress", i // one_percent)
                             # app.setMessage('console_window', app.getMessage('console_window') + 'X')
                     else:
                         print('X', end='', flush=True)
@@ -125,14 +129,16 @@ def create_locality_list(addr_file_full_path, app=None, thread_=None, queue_=Non
                 print('Stopping due to an interrupt')
                 exit(0)
     print('')
-    if app:
-        with lock:
-            app.setMeter("progress", 100)
+    if update_queue:
+        update_queue.put_nowait(100)
+    # if app:
+    #     with lock:
+    #         app.setMeter("progress", 100)
     if failed_requests:
         errors_flag = True
         print('Возникли проблемы с частью запросов, проверьте список ошибок')
-    if queue_:
-        queue_.put((locality_list, failed_requests, errors_flag))
+    if result_queue:
+        result_queue.put_nowait((locality_list, failed_requests, errors_flag))
     return (locality_list, failed_requests, errors_flag)
 
 

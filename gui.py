@@ -1,10 +1,10 @@
 from os import getcwd
 from appJar import gui
 import time
-from queue import Queue
+import queue
 from coords import *
 
-app = gui('Гео', '400x240')
+app = gui('Гео', '400x280')
 app.setPadding([2,0])
 app.setInPadding([0,0])
 app.setGuiPadding(4,14)
@@ -48,19 +48,30 @@ def press(button):
 
 
 def runProgram(button):
-    app.showSubWindow('Обработка')
+    # app.showSubWindow('Обработка')
+    time.sleep(3)
     addr_file_full_path = app.getEntry('addr_path')
     output_file_full_path = app.getEntry('save_as')
-    queue_ = Queue()
-    locality_list_thread = InterruptableThread(create_locality_list, addr_file_full_path=addr_file_full_path, app=app, queue_=queue_)
+    result_queue = queue.Queue()
+    update_queue = queue.Queue()
+    locality_list_thread = InterruptableThread(create_locality_list, addr_file_full_path=addr_file_full_path, app=app, result_queue=result_queue, update_queue=update_queue)
     locality_list_thread.start()
+    while locality_list_thread.is_alive() or not update_queue.empty():
+        # print('alive check')
+        try:
+            a = update_queue.get_nowait()
+        except queue.Empty:
+            pass
+        if 'a' in locals():
+            app.setMeter("progress", a)
+        time.sleep(.1)
     locality_list_thread.join()
     print('after join')
-    # while locality_list_thread.is_alive():
-    #     print('alive check')
-    #     time.sleep(1)
-    locality_result = queue_.get()
-    if locality_result:
+    try:
+        locality_result = result_queue.get_nowait()
+    except queue.Empty:
+        pass
+    if 'locality_result' in locals():
         create_spreadsheet(locality_result, output_file_full_path)
 
 
@@ -91,32 +102,34 @@ app.addEmptyLabel('l2', 5, 0, 3)
 app.addButton('Старт', runProgram, 6, 1)
 app.setButtonRelief('Старт', 'groove')
 app.addEmptyLabel('l3', 7, 0, 3)
-# app.addMeter('progress', 8, 0, 3)
-# app.setMeterRelief('progress', 'flat')
-# app.setMeterFill('progress', 'blue')
-
-
-app.startSubWindow("Обработка", modal=False)
-app.setGeometry("400x100")
-app.setPadding([4,8])
-app.setInPadding([0,0])
-app.setStretch('column')
-app.setFont(12)
-app.setBg('lightBlue')
-app.setLocation("CENTER")
-# app.setResizable(False)
-app.hideTitleBar()
-
-app.setSticky('ew')
-app.addMeter('progress', 0, 0, 3)
+app.addMeter('progress', 8, 0, 3)
 app.setMeterRelief('progress', 'flat')
 app.setMeterFill('progress', 'blue')
-app.addButton('Отмена', stop, 1, 1)
+app.addButton('Отмена', stop, 6, 2)
 app.setButtonRelief('Отмена', 'groove')
-app.addEmptyLabel('lw1', 2, 2, 3)
 
 
-
-app.stopSubWindow()
+# app.startSubWindow("Обработка", modal=False)
+# app.setGeometry("400x100")
+# app.setPadding([4,8])
+# app.setInPadding([0,0])
+# app.setStretch('column')
+# app.setFont(12)
+# app.setBg('lightBlue')
+# app.setLocation("CENTER")
+# app.setResizable(False)
+# app.hideTitleBar()
+#
+# app.setSticky('ew')
+# app.addMeter('progress', 0, 0, 3)
+# app.setMeterRelief('progress', 'flat')
+# app.setMeterFill('progress', 'blue')
+# app.addButton('Отмена', stop, 1, 1)
+# app.setButtonRelief('Отмена', 'groove')
+# app.addEmptyLabel('lw1', 2, 2, 3)
+#
+#
+#
+# app.stopSubWindow()
 
 app.go()
