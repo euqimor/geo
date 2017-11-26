@@ -78,20 +78,32 @@ class Locality(Location):
         return (distances[closest], closest)
 
 
-def create_locality_list(addr_file):
+def create_locality_list(addr_file_full_path, app=None):
     """
     Creates a list of Locality objects from the addresses file, stores problematic addresses in a separate list
-    :param addr_file: a text file with one address on each line
+    :param addr_file_full_path: the full path (including the file name) to the text file with one address on each line
     :return: a tuple, (obj list: Localities, str list: problematic addresses, bool: errors flag)
     """
+    import threading
+    lock = threading.Lock()
+    # def update_console_window(app, text_to_append):
+    #     original_text = app.getLabel('console_window')
+    #     app.setLabel('console_window', original_text+text_to_append)
+
+    # if app:
+    #     console_thread = threading.Thread(target=update_console_window)
+    #     console_thread.start()
+
     errors_flag = False
     locality_list = []
     failed_requests = []
-    with open(addr_file) as f:
-        for line in f:
+    with open(addr_file_full_path) as f:
+        total_addresses = len(f.readlines())
+        one_percent = total_addresses/100
+        f.seek(0)
+        for i,line in enumerate(f):
             address = line.strip()
             loc_json = geocoder.yandex(address, lang='ru-RU').json
-            # if loc_json is not None and loc_json['status'] == 'OK':
             try:
                 locality = Locality(
                     address,
@@ -102,24 +114,35 @@ def create_locality_list(addr_file):
                     loc_json['description']
                 )
                 locality_list.append(locality)
-                print('.', end='')
+                if app:
+                    with lock:
+                        app.setMeter("progress", i//one_percent)
+                        app.setLabel('console_window', app.getLabel('console_window') + '.')
+                else:
+                    print('.', end='', flush=True)
             except (KeyError, TypeError):
                 failed_requests.append(address)
-                print('X', end='')
-            # else:
-            #     failed_requests.append(address)
-            #     print('X', end='')
+                if app:
+                    with lock:
+                        app.setMeter("progress", i // one_percent)
+                        app.setLabel('console_window', app.getLabel('console_window') + 'X')
+                else:
+                    print('X', end='', flush=True)
     print('')
+    if app:
+        with lock:
+            app.setMeter("progress", 100)
     if failed_requests:
         errors_flag = True
         print('Возникли проблемы с частью запросов, проверьте список ошибок')
     return (locality_list, failed_requests, errors_flag)
 
 
-def create_spreadsheet(locality_list_tuple):
+def create_spreadsheet(locality_list_tuple: tuple, output_file_full_path: str):
     """
     :param locality_list_tuple: resulting tuple of the create_locality_list() function
-    :return: saves an excel table in the current dir
+    :param output_file_full_path: full path (including the file name) of the excel spreadsheet in which to save the data
+    :return: None, saves an excel table in the current dir
     """
     wb = Workbook()
     ws = wb.active
@@ -153,31 +176,8 @@ def create_spreadsheet(locality_list_tuple):
         ws.append(['Проблемные адреса:'])
         for item in locality_list_tuple[1]:
             ws.append([item])
-    wb.save("table_full.xlsx")
+    wb.save(output_file_full_path)
 
 
-
-
-
-if __name__ == '__main__':
-    with open('adm_centers', 'rb') as file:
-        adm_centers = pickle.load(file)
-    locality_result = create_locality_list('addr_full.csv')
-    create_spreadsheet(locality_result)
-    # for item in locality_result[0]:
-    #     print('{}\n{}, {}\nAdministrative center:\n{} - {}km\n{}, {}\nClosest center:\n{} - {}km\n\n'.format(
-    #         item.get_name(),
-    #         item.get_lat(),
-    #         item.get_lng(),
-    #         item.get_adm_center(),
-    #         item.get_adm_center_distance(),
-    #         item.adm_center.get_lat(),  # ! need method or delete
-    #         item.adm_center.get_lng(),  # ! need method or delete
-    #         item.find_closest_adm_center()[0],
-    #         item.find_closest_adm_center()[1],
-    #         )
-    #     )
-    # if locality_result[-1]:
-    #     print('Problematic addresses:')
-    #     for item in locality_result[1]:
-    #         print(item)
+with open('adm_centers', 'rb') as file:
+    adm_centers = pickle.load(file)
