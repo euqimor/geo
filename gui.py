@@ -56,15 +56,23 @@ def runProgram(button):
     update_queue = queue.Queue()
     locality_list_thread = InterruptableThread(create_locality_list, addr_file_full_path=addr_file_full_path, app=app, result_queue=result_queue, update_queue=update_queue)
     locality_list_thread.start()
-    while locality_list_thread.is_alive() or not update_queue.empty():
-        # print('alive check')
+    def update_status_bar():
         try:
             a = update_queue.get_nowait()
         except queue.Empty:
             pass
         if 'a' in locals():
             app.setMeter("progress", a)
-        time.sleep(.1)
+    app.registerEvent(update_status_bar)
+    # while locality_list_thread.is_alive() or not update_queue.empty():
+    #     print('alive check')
+    #     try:
+    #         a = update_queue.get_nowait()
+    #     except queue.Empty:
+    #         pass
+    #     if 'a' in locals():
+    #         app.setMeter("progress", a)
+    #     time.sleep(.1)
     locality_list_thread.join()
     print('after join')
     try:
