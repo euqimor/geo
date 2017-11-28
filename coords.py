@@ -79,7 +79,7 @@ class Locality(Location):
         return (distances[closest], closest)
 
 
-def create_locality_list(addr_file_full_path, app=None, thread_=None, result_queue=None, update_queue=None):
+def create_locality_list(addr_file_full_path, app=None, thread_=None, result_queue=None, interrupt_queue=None):
     """
     Creates a list of Locality objects from the addresses file, stores problematic addresses in a separate list
     :param addr_file_full_path: the full path (including the file name) to the text file with one address on each line
@@ -94,6 +94,12 @@ def create_locality_list(addr_file_full_path, app=None, thread_=None, result_que
         one_percent = total_addresses/100
         f.seek(0)
         for i,line in enumerate(f):
+            if interrupt_queue and not interrupt_queue.empty():
+                interrupt_queue.get()
+                if app:
+                    app.queueFunction(app.setMeter, "progress", 0)
+                print('interrupt')
+                return
             if thread_ is None or (thread_ and not thread_.interrupt_event.is_set()):
                 address = line.strip()
                 loc_json = geocoder.yandex(address, lang='ru-RU').json
@@ -107,9 +113,10 @@ def create_locality_list(addr_file_full_path, app=None, thread_=None, result_que
                         loc_json['description']
                     )
                     locality_list.append(locality)
-                    if update_queue:
-                        update_queue.put_nowait(i // one_percent)
-                    # if app:
+                    # if update_queue:
+                    #     update_queue.put_nowait(i // one_percent)
+                    if app:
+                        app.queueFunction(app.setMeter, "progress", i // one_percent)
                     #     with lock:
                     #         app.setMeter("progress", i//one_percent)
                             # app.setMessage('console_window', app.getMessage('console_window') + '.')
@@ -117,9 +124,10 @@ def create_locality_list(addr_file_full_path, app=None, thread_=None, result_que
                         print('.', end='', flush=True)
                 except (KeyError, TypeError):
                     failed_requests.append(address)
-                    if update_queue:
-                        update_queue.put_nowait(i // one_percent)
-                    # if app:
+                    # if update_queue:
+                    #     update_queue.put_nowait(i // one_percent)
+                    if app:
+                        app.queueFunction(app.setMeter, "progress", i // one_percent)
                     #     with lock:
                     #         app.setMeter("progress", i // one_percent)
                             # app.setMessage('console_window', app.getMessage('console_window') + 'X')
@@ -129,9 +137,10 @@ def create_locality_list(addr_file_full_path, app=None, thread_=None, result_que
                 print('Stopping due to an interrupt')
                 exit(0)
     print('')
-    if update_queue:
-        update_queue.put_nowait(100)
-    # if app:
+    # if update_queue:
+    #     update_queue.put_nowait(100)
+    if app:
+        app.queueFunction(app.setMeter, "progress", 100)
     #     with lock:
     #         app.setMeter("progress", 100)
     if failed_requests:
