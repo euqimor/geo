@@ -229,7 +229,7 @@ def open_file(button):
 
 
 def save_file(button):
-    a = app.saveBox()
+    a = app.saveBox(fileExt=".xlsx")
     if a != '':
         app.setEntry('save_as', a)
 
@@ -256,7 +256,7 @@ def info(button):
 1. В файле excel удалить все столбцы, кроме столбцов адреса. Адрес может быть разбит на несколько столбцов: например в первом столбце город, а во втором - остальное. Главное, чтобы в каждой строке таблицы не было ничего, кроме адреса.\n
 2. Экспортировать таблицу в формат CSV:
 Файл -> Экспорт -> Изменить тип файла -> CSV (Разделители - запятые)\n
-3. Запустить Geo и нажать на кнопку рядом со строкой "Путь к файлу адресов". В открывшемся окне найти и выбрать созданный файл CSV.\n
+3. Перейти в программу и нажать на кнопку рядом со строкой "Путь к файлу адресов". В открывшемся окне найти и выбрать созданный файл CSV.\n
 4. В строке "Сохранить результат в" указать путь и название файла, в котором будет сохранён результат. Для этого можно также воспользоваться кнопкой обзора.\n
 5. Нажать кнопку "Старт" и дождаться окончания обработки. Файл появится в папке, указанной в п. 4\n
 '''
@@ -386,6 +386,7 @@ if __name__ == '__main__':
 
     # GUI initialization
     app = gui('Geo', '400x238')
+    app.setIcon(ico)
     app.setPadding([2, 0])
     app.setInPadding([0, 0])
     app.setGuiPadding(4, 4)
@@ -397,14 +398,12 @@ if __name__ == '__main__':
     app.setSticky('w')
     app.addLabel('addr_path_descr', 'Путь к файлу адресов:', 0, 0, 2)
     app.setSticky('ne')
-    # app.addIconButton('info', info, 'info', 0, 2)
     app.addImageButton('info', info, img_info, 0, 2)
     app.setButtonRelief('info', 'groove')
     app.setSticky('ew')
     app.addEntry('addr_path', 1, 0, 2)
     app.setEntry('addr_path', 'G:\\Py\geo\\addr_short.csv')
     app.setSticky('w')
-    # app.addIconButton('bt1', open_file, 'open', 1, 2)
     app.addImageButton('bt1', open_file, img_open, 1, 2)
     app.setButtonRelief('bt1', 'groove')
     app.addEmptyLabel('l1', 2, 0, 3)
@@ -413,7 +412,6 @@ if __name__ == '__main__':
     app.addEntry('save_as', 4, 0, 2)
     app.setEntry('save_as', '{}\\output.xlsx'.format(getcwd()))
     app.setSticky('w')
-    # app.addIconButton('bt2', save_file, 'open', 4, 2)
     app.addImageButton('bt2', save_file, img_open, 4, 2)
     app.setButtonRelief('bt2', 'groove')
     app.setSticky('ew')
@@ -430,7 +428,6 @@ if __name__ == '__main__':
     app.setButtonRelief('Готово', 'groove')
     app.hideButton('Отмена')
     app.hideButton('Готово')
-    app.setIcon(ico)
 
     app.registerEvent(save_result)
     app.go()
